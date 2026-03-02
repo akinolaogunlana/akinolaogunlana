@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from dataclasses import asdict, dataclass, field
 
 
-class RenderRequest(BaseModel):
-    text: str = Field(min_length=1)
+@dataclass(slots=True)
+class RenderRequest:
+    text: str
     use_psychological_pacing: bool = True
-    pause_intensity: float = Field(default=1.0, ge=0.5, le=2.0)
-    neutrality_intensity: float = Field(default=0.85, ge=0.5, le=1.0)
+    pause_intensity: float = 1.0
+    neutrality_intensity: float = 0.85
     shadow_mode: bool = False
-    provider: str = Field(default="local_coqui")
-    output_format: str = Field(default="wav", pattern="^(wav|mp3)$")
+    provider: str = "local_coqui"
+    output_format: str = "wav"
     include_room_tone: bool = False
 
 
-class Segment(BaseModel):
+@dataclass(slots=True)
+class Segment:
     text: str
     category: str
     pause_after_ms: int
@@ -22,15 +24,22 @@ class Segment(BaseModel):
     pitch_shift_semitones: float
 
 
-class RenderResponse(BaseModel):
+@dataclass(slots=True)
+class RenderResponse:
     job_id: str
     provider: str
     output_path: str
     segments: list[Segment]
-    warnings: list[str] = []
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        data = asdict(self)
+        data["segments"] = [asdict(seg) for seg in self.segments]
+        return data
 
 
-class BatchRenderRequest(BaseModel):
-    scripts: list[str] = Field(min_length=1)
+@dataclass(slots=True)
+class BatchRenderRequest:
+    scripts: list[str]
     shadow_mode: bool = True
     export_timestamps: bool = True
