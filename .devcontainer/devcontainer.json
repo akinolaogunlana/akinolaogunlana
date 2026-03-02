@@ -1,0 +1,16 @@
+{
+  "name": "shadow-tts-codespace",
+  "build": {
+    "dockerfile": "../shadow-tts/Dockerfile",
+    "context": ".."
+  },
+  "forwardPorts": [7860],
+  "postCreateCommand": "pip install -r shadow-tts/requirements.txt",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}

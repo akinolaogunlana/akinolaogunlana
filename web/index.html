@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Psychological Masterclass TTS</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 860px; margin: 2rem auto; line-height: 1.4; }
+    textarea { width: 100%; min-height: 220px; }
+    .row { display: flex; gap: 1rem; margin: 0.7rem 0; align-items: center; }
+    label { min-width: 210px; }
+    button { padding: 0.7rem 1rem; }
+    pre { background: #f3f3f3; padding: 1rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Psychological Masterclass Voice Engine</h1>
+  <textarea id="text" placeholder="Paste script..."></textarea>
+
+  <div class="row">
+    <label><input type="checkbox" id="psych" checked> Psychological pacing</label>
+    <label><input type="checkbox" id="shadow"> Shadow Mode preset</label>
+  </div>
+  <div class="row">
+    <label>Pause intensity</label>
+    <input id="pause" type="range" min="0.5" max="2" step="0.1" value="1.2" />
+    <span id="pauseVal">1.2</span>
+  </div>
+  <div class="row">
+    <label>Neutrality intensity</label>
+    <input id="neutral" type="range" min="0.5" max="1" step="0.05" value="0.9" />
+    <span id="neutralVal">0.9</span>
+  </div>
+
+  <button id="export">Export</button>
+
+  <h3>Render Response</h3>
+  <pre id="out"></pre>
+
+<script>
+  const pause = document.getElementById('pause');
+  const neutral = document.getElementById('neutral');
+  pause.oninput = () => document.getElementById('pauseVal').innerText = pause.value;
+  neutral.oninput = () => document.getElementById('neutralVal').innerText = neutral.value;
+
+  document.getElementById('export').onclick = async () => {
+    const payload = {
+      text: document.getElementById('text').value,
+      use_psychological_pacing: document.getElementById('psych').checked,
+      pause_intensity: Number(pause.value),
+      neutrality_intensity: Number(neutral.value),
+      shadow_mode: document.getElementById('shadow').checked,
+      provider: 'local_coqui',
+      output_format: 'wav'
+    };
+    const res = await fetch('http://localhost:8000/render', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    document.getElementById('out').textContent = JSON.stringify(await res.json(), null, 2);
+  };
+</script>
+</body>
+</html>

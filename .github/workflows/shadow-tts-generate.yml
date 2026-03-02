@@ -1,0 +1,70 @@
+name: Shadow TTS Generate
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: "Text to synthesize"
+        required: true
+        type: string
+  push:
+    paths:
+      - "shadow-tts/input/*.txt"
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install runtime deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl xz-utils
+          python -m pip install --upgrade pip
+          pip install -r shadow-tts/requirements.txt
+
+      - name: Download Piper binary + lightweight voice
+        run: |
+          mkdir -p shadow-tts/models
+          curl -L -o /tmp/piper.tar.gz https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_linux_x86_64.tar.gz
+          tar -xzf /tmp/piper.tar.gz -C /tmp
+          sudo mv /tmp/piper/piper /usr/local/bin/piper
+          curl -L -o shadow-tts/models/en_US-lessac-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx
+          curl -L -o shadow-tts/models/en_US-lessac-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
+
+      - name: Run synthesis
+        env:
+          INPUT_TEXT: ${{ github.event.inputs.text }}
+        run: |
+          cd shadow-tts
+          mkdir -p out
+          python - <<'PY'
+import os, json
+from pathlib import Path
+from app import render_shadow_tts
+
+text = os.getenv("INPUT_TEXT", "").strip()
+if not text:
+    input_dir = Path("input")
+    files = sorted(input_dir.glob("*.txt"))
+    text = files[0].read_text() if files else "You think you want clarity. But you protect your illusions."
+out = render_shadow_tts(text=text, shadow_mode=True)
+Path("out/prepared.txt").write_text(out["prepared_text"])
+Path("out/result.json").write_text(json.dumps(out, indent=2))
+Path("out/shadow.wav").write_bytes(Path(out["wav_path"]).read_bytes())
+if out.get("mp3_path"):
+    Path("out/shadow.mp3").write_bytes(Path(out["mp3_path"]).read_bytes())
+PY
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-tts-output
+          path: shadow-tts/out/*
