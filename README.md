@@ -1,57 +1,103 @@
-# Psychological Masterclass Voice TTS Engine
+# GitHub-Hosted Open-Source Shadow Psychology TTS Engine
 
-Working local implementation for psychologically controlled long-form narration workflows.
+This repository implements a **fully open-source** Shadow-style TTS pipeline designed to be controlled from GitHub.
 
-## Architecture (text diagram)
+## What this solves
+- Runs with GitHub-first workflows (no paid/proprietary speech APIs).
+- Supports CI-triggered generation via GitHub Actions.
+- Includes Codespaces-ready container setup.
+- Supports optional API hosting on open platforms (Render/Fly.io/HuggingFace Spaces).
+- Uses open-source stack only (`piper`, `ffmpeg`, `pydub`, `librosa`, `torchaudio`, `gradio`).
+
+## Repository structure
 
 ```text
-[Web UI]
-  -> POST /render
-[Python HTTP API]
-  -> [Psychological Pacing Engine]
-     - contradiction/inversion/reveal/reframe/identity detection
-     - pause map generation + speed/pitch dampening
-  -> [Provider Adapter]
-     - local_coqui (dependency-free waveform renderer)
-     - elevenlabs (stub for API key integration)
-     - local_gpu (stub for XTTS/Tortoise integration)
-  -> [Exporter]
-     - WAV output + timestamp map for editing
+/shadow-tts
+  /models
+  /preprocessing
+  /audio
+  /workflows
+  /api
+  /ui
+  app.py
+  Dockerfile
+  requirements.txt
+README.md
+.github/workflows/shadow-tts-generate.yml
+.devcontainer/devcontainer.json
 ```
 
-## What now works out-of-the-box
+## Deployment architecture
 
-- No external package dependency required.
-- `/render` creates a real WAV file (non-silent preview speech surrogate).
-- `/render/batch` returns timestamps for scene/video edits.
-- Shadow Mode profile enforces slower, flatter delivery.
-- Frontend exports directly to the local API.
+### Option A — GitHub Actions inference
+1. Trigger workflow manually (`workflow_dispatch`) or push `shadow-tts/input/*.txt`.
+2. Action installs ffmpeg + Python deps.
+3. Action downloads open-source Piper binary + voice model.
+4. Action runs synthesis and preprocessing.
+5. Outputs uploaded as GitHub artifacts (`shadow.wav`, optional `shadow.mp3`, prepared text).
 
-## Core controls
+Workflow file: `.github/workflows/shadow-tts-generate.yml`.
 
-- Speech rate control via segment speed multipliers.
-- Psychological pause scaling (`pause_intensity`).
-- Pattern-aware slowdown + lower pitch emphasis.
-- Pitch range + neutrality controls in profile objects.
-- Optional provider switching with fallback to local renderer.
+### Option B — GitHub Codespaces
+- One-click launch with `.devcontainer/devcontainer.json`.
+- Container builds from `shadow-tts/Dockerfile`.
+- Run `python app.py` to launch Gradio UI.
 
-## API options (recommendations)
+### Option C — External open hosting (GitHub-controlled)
+- Build/deploy same Docker image to Render/Fly.io/HuggingFace Spaces.
+- Keep GitHub as source of truth and trigger deploys via CI/CD.
+- Optional API mode: `python api/server.py` (`/health`, `/render`).
 
-1. **Option A (local Python)**: Replace `LocalCoquiBackend` render loop with Coqui XTTS inference.
-2. **Option B (API)**: Implement ElevenLabs in `ElevenLabsBackend` with stability ~0.8-0.9, style low.
-3. **Option C (local GPU)**: Integrate XTTS-v2/Tortoise + quantization + batched chunks.
+## Shadow preprocessor module
+File: `shadow-tts/preprocessing/shadow_preprocessor.py`
 
-## Scalability + latency
+- Detects short impact lines, inversion/reversal phrases, identity destabilizers, analytical transitions.
+- Injects SSML-like tokens: `<break time="Nms"/>`.
+- Configurable pause profile:
+  - `pause_short: 700ms`
+  - `pause_inversion: 1500ms`
+  - `pause_analytical: 400ms`
 
-- Segment scripts into 20-40 sentence chunks.
-- Queue chunk renders (Redis/Celery/RQ) and stitch output.
-- Cache repeated paragraphs and pause maps.
-- Async post-processing workers for compression/de-ess/EQ stage.
+## Audio processing stack (open-source)
+File: `shadow-tts/audio/postprocess.py`
 
-## Run
+- ffmpeg compression
+- loudness normalization
+- subtle low-mid EQ shaping
+- WAV -> MP3 export
+- Works with pydub/librosa/torchaudio ecosystem in requirements for extension workflows.
+
+## Runtime modes
+- **Gradio UI** (HuggingFace Spaces friendly): `python app.py`
+- **API endpoint**: `python api/server.py`
+
+## Model recommendation
+Default workflow downloads:
+- Piper binary v1.2.0
+- `en_US-lessac-medium` ONNX model (lightweight, CPU-friendly)
+
+This fits GitHub-hosted runner constraints better than larger CUDA-dependent models.
+
+## Scalability and limits
+- GitHub-hosted runners are bounded by wall-clock and RAM (~7GB typical practical envelope).
+- Use sentence segmentation and chunk synthesis for long scripts.
+- Upload chunked outputs as artifacts and merge downstream.
+
+## Cost analysis (API vs local open infra)
+- Proprietary API TTS: zero infra setup, recurring per-character fees (not used here).
+- Open self-hosted GitHub workflow: no proprietary fees, compute bounded by Actions quotas.
+- External open hosting: predictable infra cost + no vendor speech lock-in.
+
+## Quick start (local container parity with hosted)
 
 ```bash
-python -m app.main
+cd shadow-tts
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
 ```
 
-Then open `web/index.html` and render.
+## Notes
+- Pipeline is intentionally open-source only.
+- If Piper/model is unavailable, fallback renderer is used for deterministic CI behavior.
